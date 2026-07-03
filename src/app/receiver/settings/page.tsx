@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, Bell, Shield, MapPin, User, Navigation, Utensils } from "lucide-react";
+import { Save, Bell, Shield, MapPin, User, Navigation, Utensils, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -12,6 +13,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getUsers, updateUser } from "@/actions/users";
+import { geocodeAddress, reverseGeocode } from "@/actions/geocode";
+import dynamic from "next/dynamic";
+
+const GoogleMap = dynamic(() => import("@/components/google-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[300px] w-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center rounded-xl border border-dashed">
+      <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
+    </div>
+  ),
+});
 
 function SettingsSection({ icon: Icon, title, children }: { icon: React.ComponentType<{ className?: string }>; title: string; children: React.ReactNode }) {
   return (
@@ -52,6 +65,84 @@ function Toggle({ label, description, defaultChecked = false }: { label: string;
 }
 
 export default function ReceiverSettingsPage() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [location, setLocation] = useState("");
+  const [lat, setLat] = useState(12.9352);
+  const [lng, setLng] = useState(77.6245);
+  const [isLocating, setIsLocating] = useState(false);
+
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const users = await getUsers({ role: "receiver" });
+        if (users.length > 0) {
+          const u = users[0];
+          setUser(u);
+          if (u.address) setLocation(u.address);
+          if (u.latitude) setLat(Number(u.latitude));
+          if (u.longitude) setLng(Number(u.longitude));
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadUser();
+  }, []);
+
+  const handleAddressBlur = async () => {
+    if (!location) return;
+    setIsLocating(true);
+    try {
+      const coords = await geocodeAddress(location);
+      setLat(coords.lat);
+      setLng(coords.lng);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  const handleMapClick = async (clickedLat: number, clickedLng: number) => {
+    setLat(clickedLat);
+    setLng(clickedLng);
+    setIsLocating(true);
+    try {
+      const addressStr = await reverseGeocode(clickedLat, clickedLng);
+      setLocation(addressStr);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      await updateUser(user.id, {
+        address: location,
+        latitude: lat,
+        longitude: lng,
+      });
+      alert("Settings saved successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-8 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-sky-500" /></div>;
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
@@ -59,8 +150,9 @@ export default function ReceiverSettingsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
           <p className="text-muted-foreground">Manage your preferences and alerts</p>
         </div>
-        <Button className="rounded-xl gradient-sky text-white border-0 hover:opacity-90 shadow-md">
-          <Save className="h-4 w-4 mr-2" /> Save Changes
+        <Button onClick={handleSave} disabled={saving} className="rounded-xl gradient-sky text-white border-0 hover:opacity-90 shadow-md">
+          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+          Save Changes
         </Button>
       </div>
 
@@ -69,21 +161,47 @@ export default function ReceiverSettingsPage() {
         <SettingsSection icon={User} title="Personal Information">
           <div className="grid sm:grid-cols-2 gap-4">
             <FieldRow label="Full Name">
-              <Input defaultValue="Arun Patel" className="h-11 rounded-xl" />
+              <Input defaultValue={user?.name || "Guest"} className="h-11 rounded-xl" />
             </FieldRow>
             <FieldRow label="Email Address">
-              <Input defaultValue="arun.patel@example.com" type="email" className="h-11 rounded-xl" />
+              <Input defaultValue={user?.email || ""} type="email" className="h-11 rounded-xl" />
             </FieldRow>
           </div>
           <FieldRow label="Phone Number" description="Used for urgent pickup coordination">
-            <Input defaultValue="+91 98765 12345" type="tel" className="h-11 rounded-xl max-w-md" />
+            <Input defaultValue={user?.phone || ""} type="tel" className="h-11 rounded-xl max-w-md" />
           </FieldRow>
         </SettingsSection>
 
         {/* Smart Zone Settings */}
         <SettingsSection icon={Navigation} title="Smart Notification Zone">
           <FieldRow label="Primary Base Location" description="Center point for your search radius">
-            <Input defaultValue="Koramangala, Bangalore" className="h-11 rounded-xl" />
+            <div className="relative mb-4">
+              <Input 
+                value={location} 
+                onChange={(e) => setLocation(e.target.value)}
+                onBlur={handleAddressBlur}
+                className="h-11 rounded-xl pr-10" 
+              />
+              {isLocating ? (
+                 <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-sky-500" />
+              ) : (
+                 <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+            
+            <div className="mt-4 border rounded-xl overflow-hidden shadow-sm relative">
+              <GoogleMap 
+                height="h-[300px]" 
+                center={{ lat, lng }} 
+                zoom={14} 
+                markers={[{ id: "me", label: "My Location", type: "available", position: { lat, lng } }]}
+                onMapClick={(e: any) => handleMapClick(e.latLng.lat(), e.latLng.lng())}
+              />
+              <div className="absolute top-2 left-2 bg-background/90 backdrop-blur px-3 py-1.5 rounded-lg text-xs font-medium border shadow-sm flex items-center gap-2">
+                <MapPin className="h-3.5 w-3.5 text-sky-500" />
+                Drag or click to update
+              </div>
+            </div>
           </FieldRow>
           <FieldRow label="Notification Radius" description="You will only be alerted for food within this distance">
             <div className="flex items-center gap-2 max-w-xs">

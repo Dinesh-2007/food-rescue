@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/status-badge";
 import { CountdownTimer } from "@/components/countdown-timer";
 import { EmptyState } from "@/components/empty-state";
-import { mockDonations } from "@/lib/mock-data";
+import { getDonations } from "@/actions/donations";
 import {
   Search,
   Eye,
@@ -29,8 +29,22 @@ const filterTabs = ["All", "Today", "Active", "Completed", "Expired", "Cancelled
 export default function DonorDonationsPage() {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
+  const [myDonations, setMyDonations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const myDonations = mockDonations.filter((d) => d.donorId === "USR-D001" || d.donorId === "USR-D002");
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await getDonations(); // We'll just fetch all and filter client side for now
+        setMyDonations(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   const filtered = myDonations.filter((d) => {
     if (search && !d.foodName.toLowerCase().includes(search.toLowerCase())) return false;
@@ -70,7 +84,9 @@ export default function DonorDonationsPage() {
       </div>
 
       {/* Donation Cards */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="py-8 text-center text-muted-foreground animate-pulse">Loading donations...</div>
+      ) : filtered.length === 0 ? (
         <EmptyState icon={Package} title="No donations found" description="No donations match your current filter." actionLabel="Create Donation" actionHref="/donor/create" />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -101,21 +117,21 @@ export default function DonorDonationsPage() {
                   <div className="p-1.5 rounded-lg bg-muted/50">
                     <div className="flex items-center justify-center gap-1">
                       <Radio className="h-3 w-3 text-sky-500" />
-                      <span className="text-xs font-medium">{donation.currentRadius}km</span>
+                      <span className="text-xs font-medium">{donation.currentRadius || 5}km</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground">Radius</p>
                   </div>
                   <div className="p-1.5 rounded-lg bg-muted/50">
                     <div className="flex items-center justify-center gap-1">
                       <Users className="h-3 w-3 text-emerald-500" />
-                      <span className="text-xs font-medium">{donation.receiversNotified}</span>
+                      <span className="text-xs font-medium">{donation.receiversNotified || 0}</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground">Notified</p>
                   </div>
                   <div className="p-1.5 rounded-lg bg-muted/50">
                     <div className="flex items-center justify-center gap-1">
                       <Eye className="h-3 w-3 text-violet-500" />
-                      <span className="text-xs font-medium">{donation.views}</span>
+                      <span className="text-xs font-medium">{donation.views || 0}</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground">Views</p>
                   </div>

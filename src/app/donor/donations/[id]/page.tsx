@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { CountdownTimer } from "@/components/countdown-timer";
 import { RadiusTimeline } from "@/components/radius-timeline";
 import { MapPlaceholder } from "@/components/map-placeholder";
-import { mockDonations, mockNotificationLogs } from "@/lib/mock-data";
+import { getDonationById } from "@/actions/donations";
 import {
   ArrowLeft,
   MapPin,
@@ -27,8 +27,36 @@ import Link from "next/link";
 
 export default function DonationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const donation = mockDonations.find((d) => d.id === id) || mockDonations[0];
-  const notifLog = mockNotificationLogs.find((l) => l.donationId === donation.id);
+  const [donation, setDonation] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await getDonationById(Number(id));
+        setDonation(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [id]);
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-[600px] text-muted-foreground animate-pulse">Loading...</div>;
+  }
+
+  if (!donation) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[600px] p-4 text-center">
+        <h2 className="text-2xl font-bold mb-3">Donation not found</h2>
+        <Link href="/donor/donations"><Button className="rounded-xl gradient-sky text-white border-0">Back to Donations</Button></Link>
+      </div>
+    );
+  }
+
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -74,27 +102,26 @@ export default function DonationDetailPage({ params }: { params: Promise<{ id: s
           </Card>
 
           {/* Notification Timeline */}
-          {notifLog && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Radio className="h-5 w-5 text-sky-500" /> Notification Timeline
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-center py-4">
-                  <RadiusTimeline
-                    steps={notifLog.expansionTimeline.map((e, i) => ({
-                      radius: e.radius,
-                      notified: e.notified,
-                      time: new Date(e.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                      status: i < notifLog.expansionTimeline.length - 1 ? "completed" as const : notifLog.collectionResult === "collected" ? "completed" as const : "active" as const,
-                    }))}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Radio className="h-5 w-5 text-sky-500" /> Notification Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-center py-4">
+                <RadiusTimeline
+                  steps={[
+                    { radius: 5, status: "completed", notified: Math.floor((donation.receiversNotified || 0) * 0.3) },
+                    { radius: 8, status: "completed", notified: Math.floor((donation.receiversNotified || 0) * 0.4) },
+                    { radius: 12, status: (donation.currentRadius || 5) >= 12 ? "completed" : donation.status === "active" ? "active" : "pending", notified: Math.floor((donation.receiversNotified || 0) * 0.3) },
+                    { radius: 20, status: (donation.currentRadius || 5) >= 20 ? "completed" : "pending" },
+                  ]}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
         </div>
 
         {/* Right - Sidebar */}

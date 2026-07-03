@@ -1,11 +1,10 @@
-"use client";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/status-badge";
-import { mockDonors } from "@/lib/mock-data";
+import { getUsers } from "@/actions/users";
+import { getDonations } from "@/actions/donations";
 import {
   Building2,
   MapPin,
@@ -22,8 +21,19 @@ import {
   Package,
 } from "lucide-react";
 
-export default function DonorProfilePage() {
-  const profile = mockDonors[0]; // Rajesh Kumar
+export default async function DonorProfilePage() {
+  const donors = await getUsers({ role: "donor" });
+  const profile = donors.length > 0 ? donors[0] : null;
+  const myDonations = await getDonations();
+  const totalDonations = myDonations.length;
+  const completedDonations = myDonations.filter((d: any) => d.status === "completed").length;
+  const estimatedMeals = myDonations.reduce((sum: number, d: any) => sum + (d.servings || 0), 0);
+  const foodSavedKg = Math.round(estimatedMeals * 0.4);
+  const co2Reduced = Math.round(foodSavedKg * 0.7);
+
+  if (!profile) {
+    return <div className="p-8 text-center text-muted-foreground">No donor profile found. Please register.</div>;
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">
@@ -34,7 +44,7 @@ export default function DonorProfilePage() {
           <div className="flex flex-col sm:flex-row sm:items-end gap-6 -mt-12 mb-6">
             <Avatar className="h-24 w-24 border-4 border-card rounded-2xl shadow-xl">
               <AvatarFallback className="bg-sky-100 text-sky-700 text-2xl font-bold dark:bg-sky-900 dark:text-sky-300">
-                {profile.name.split(" ").map((n) => n[0]).join("")}
+                {profile.name ? profile.name.split(" ").map((n: string) => n[0]).join("") : "U"}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
@@ -157,21 +167,21 @@ export default function DonorProfilePage() {
                   <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900 text-sky-600 mb-2">
                     <Utensils className="h-5 w-5" />
                   </div>
-                  <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">{profile.totalDonations}</p>
+                  <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">{totalDonations}</p>
                   <p className="text-xs text-muted-foreground mt-1">Total Donations</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 text-center">
                   <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-600 mb-2">
                     <Package className="h-5 w-5" />
                   </div>
-                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{profile.foodSavedKg?.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{foodSavedKg.toLocaleString()}</p>
                   <p className="text-xs text-muted-foreground mt-1">Food Saved (kg)</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 text-center">
                   <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900 text-amber-600 mb-2">
                     <Leaf className="h-5 w-5" />
                   </div>
-                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">692</p>
+                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{co2Reduced}</p>
                   <p className="text-xs text-muted-foreground mt-1">CO₂ Reduced (kg)</p>
                 </div>
               </div>

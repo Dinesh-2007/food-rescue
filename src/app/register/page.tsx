@@ -16,7 +16,10 @@ import {
   ShieldCheck,
   ArrowRight,
   Check,
+  MapPin,
+  Loader2,
 } from "lucide-react";
+import { geocodeAddress } from "@/actions/geocode";
 
 const roles = [
   {
@@ -50,6 +53,25 @@ export default function RegisterPage() {
   const [selectedRole, setSelectedRole] = useState<"donor" | "receiver" | "admin">("donor");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  
+  const [location, setLocation] = useState("");
+  const [latitude, setLatitude] = useState(0);
+  const [longitude, setLongitude] = useState(0);
+  const [isLocating, setIsLocating] = useState(false);
+
+  const handleAddressBlur = async () => {
+    if (!location) return;
+    setIsLocating(true);
+    try {
+      const { lat, lng } = await geocodeAddress(location);
+      setLatitude(lat);
+      setLongitude(lng);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLocating(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex">
@@ -205,6 +227,31 @@ export default function RegisterPage() {
                   </button>
                 </div>
               </div>
+
+              {selectedRole !== "admin" && (
+                <div className="space-y-2">
+                  <Label htmlFor="address">Base Location</Label>
+                  <div className="relative">
+                    <Input
+                      id="address"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      onBlur={handleAddressBlur}
+                      placeholder={selectedRole === "donor" ? "Restaurant / Business Address" : "City or Neighborhood"}
+                      className="h-11 rounded-xl pr-10"
+                    />
+                    {isLocating ? (
+                       <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-sky-500" />
+                    ) : (
+                       <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedRole === "receiver" ? "We'll show you food near this location." : "Donations will be picked up from here."}
+                  </p>
+                </div>
+              )}
+
 
               <Link href={selectedRole === "admin" ? "/admin" : selectedRole === "receiver" ? "/receiver" : "/donor"}>
                 <Button className="w-full h-11 rounded-xl gradient-sky text-white border-0 hover:opacity-90 shadow-md mt-2">

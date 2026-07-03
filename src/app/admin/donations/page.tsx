@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { CountdownTimer } from "@/components/countdown-timer";
-import { mockDonations } from "@/lib/mock-data";
+import { getDonations } from "@/actions/donations";
 import {
   Search,
   Eye,
@@ -25,8 +25,24 @@ const filterTabs = ["All", "Today", "Active", "Expired", "Completed", "High Quan
 export default function AdminDonationsPage() {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
+  const [allDonations, setAllDonations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = mockDonations.filter((d) => {
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await getDonations();
+        setAllDonations(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const filtered = allDonations.filter((d) => {
     if (search && !d.foodName.toLowerCase().includes(search.toLowerCase()) && !d.donorName.toLowerCase().includes(search.toLowerCase())) return false;
     if (activeFilter === "Active" && d.status !== "active") return false;
     if (activeFilter === "Expired" && d.status !== "expired") return false;
@@ -46,7 +62,7 @@ export default function AdminDonationsPage() {
         </div>
         <Badge variant="secondary" className="rounded-full self-start">
           <Package className="h-3.5 w-3.5 mr-1" />
-          {mockDonations.length} Total
+          {allDonations.length} Total
         </Badge>
       </div>
 
@@ -100,7 +116,11 @@ export default function AdminDonationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map((donation) => (
+                {loading ? (
+                  <tr><td colSpan={10} className="text-center py-8 text-muted-foreground animate-pulse">Loading donations...</td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">No donations found.</td></tr>
+                ) : filtered.map((donation) => (
                   <tr key={donation.id} className="hover:bg-accent/30 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -120,7 +140,7 @@ export default function AdminDonationsPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
                         <Radio className="h-3 w-3 text-sky-500" />
-                        <span className="text-sm">{donation.currentRadius} km</span>
+                        <span className="text-sm">{donation.currentRadius || 5} km</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -131,10 +151,10 @@ export default function AdminDonationsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className="text-sm font-medium">{donation.views}</span>
+                      <span className="text-sm font-medium">{donation.views || 0}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className="text-sm font-medium">{donation.receiversNotified}</span>
+                      <span className="text-sm font-medium">{donation.receiversNotified || 0}</span>
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={donation.status} />
@@ -167,7 +187,7 @@ export default function AdminDonationsPage() {
           </div>
           {/* Pagination */}
           <div className="flex items-center justify-between px-4 py-3 border-t">
-            <p className="text-sm text-muted-foreground">Showing {filtered.length} of {mockDonations.length} donations</p>
+            <p className="text-sm text-muted-foreground">Showing {filtered.length} of {allDonations.length} donations</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="rounded-xl" disabled>Previous</Button>
               <Button variant="outline" size="sm" className="rounded-xl gradient-sky text-white border-0">1</Button>

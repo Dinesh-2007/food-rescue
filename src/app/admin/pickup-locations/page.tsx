@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { MapPlaceholder } from "@/components/map-placeholder";
 import { EmptyState } from "@/components/empty-state";
-import { mockPickupLocations } from "@/lib/mock-data";
 import {
   Search,
   MapPin,
@@ -39,9 +38,10 @@ const typeLabels: Record<string, string> = {
 export default function PickupLocationsPage() {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"list" | "map">("list");
+  const mockPickupLocations: any[] = [];
 
   const filtered = mockPickupLocations.filter((l) => {
-    if (search && !l.name.toLowerCase().includes(search.toLowerCase()) && !l.address.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !l.name?.toLowerCase().includes(search.toLowerCase()) && !l.address?.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 

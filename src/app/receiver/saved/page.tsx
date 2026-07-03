@@ -1,11 +1,12 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
 import { CountdownTimer } from "@/components/countdown-timer";
 import { EmptyState } from "@/components/empty-state";
-import { mockDonations } from "@/lib/mock-data";
+import { getDonations } from "@/actions/donations";
 import {
   Bookmark,
   MapPin,
@@ -15,8 +16,23 @@ import {
 import Link from "next/link";
 
 export default function ReceiverSavedPage() {
-  // Mock saved items (just taking the first two active ones for demo)
-  const savedFood = mockDonations.filter((d) => d.status === "active").slice(0, 2);
+  const [savedFood, setSavedFood] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        // Shows active donations as "saved" — in future, a dedicated saved/bookmarks table would be used
+        const data = await getDonations({ status: "active" });
+        setSavedFood(data.slice(0, 5));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">

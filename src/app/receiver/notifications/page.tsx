@@ -3,15 +3,14 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { mockNotifications } from "@/lib/mock-data";
 import { EmptyState } from "@/components/empty-state";
 import { Bell, Check, Trash2, Settings, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 export default function ReceiverNotificationsPage() {
-  // Mock notifications for receiver (filtering out donor-specific ones for demo)
-  const receiverNotifications = mockNotifications.filter(n => n.type === "new_food" || n.type === "expiring" || n.type === "system");
-  const unreadCount = receiverNotifications.filter((n) => !n.read).length;
+  // Notifications will be sourced from DB here in future
+  const receiverNotifications: any[] = [];
+  const unreadCount = 0;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-4xl mx-auto">

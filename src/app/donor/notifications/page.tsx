@@ -3,13 +3,13 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { mockNotifications } from "@/lib/mock-data";
 import { EmptyState } from "@/components/empty-state";
 import { Bell, Check, Trash2, Settings } from "lucide-react";
 import Link from "next/link";
 
 export default function DonorNotificationsPage() {
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
+  const mockNotifications: any[] = [];
+  const unreadCount = 0;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-4xl mx-auto">

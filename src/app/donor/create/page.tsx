@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, DragEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,12 +19,31 @@ import {
   MapPin,
   Clock,
   CheckCircle2,
-  Image as ImageIcon,
   ArrowRight,
   ArrowLeft,
   Info,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import { createDonation } from "@/actions/donations";
+import { reverseGeocode, geocodeAddress } from "@/actions/geocode";
+import type { GoogleMapMarker } from "@/components/google-map";
+import { ImageUploader, type UploadedImage } from "@/components/ui/ImageUploader";
+import { CloudinaryImage } from "@/components/ui/CloudinaryImage";
+
+// ─── Dynamic imports ──────────────────────────────────────────────────────────
+
+const GoogleMap = dynamic(() => import("@/components/google-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full min-h-[300px] bg-slate-100 dark:bg-slate-900 flex items-center justify-center rounded-xl">
+      <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
+    </div>
+  ),
+});
+
+// ─── Steps ────────────────────────────────────────────────────────────────────
 
 const steps = [
   { id: 1, title: "Food Details", icon: ChefHat },
@@ -33,31 +52,132 @@ const steps = [
   { id: 4, title: "Review", icon: CheckCircle2 },
 ];
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function CreateDonationWizard() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+
+  const [formData, setFormData] = useState({
+    foodName: "",
+    category: "",
+    isVeg: false,
+    quantity: "",
+    servings: 0,
+    temperature: "",
+    description: "",
+    availableFrom: "18:00",
+    availableUntil: "22:00",
+    // Image — Cloudinary URLs only
+    imageUrl: "",
+    publicId: "",
+    // Legacy `image` field kept in sync for display fallback
+    image: "",
+    // Location
+    pickupLocation: "Grand Palace Banquet, 123 MG Road, Bangalore",
+    latitude: 12.9352,
+    longitude: 77.6245,
+    // Meta
+    donorName: "Rajesh Kumar",
+    donorId: 1,
+    status: "active",
+    notificationRadius: 5,
+    currentRadius: 5,
+    receiversNotified: 0,
+    views: 0,
+    expansions: 0,
+    freshness: "fresh",
+    priority: "medium",
+  });
+
+  const updateForm = (field: string, value: unknown) =>
+    setFormData((prev) => ({ ...prev, [field]: value }));
+
+  // ── Image upload callback ──────────────────────────────────────────────────
+
+  const handleUploadSuccess = ({ imageUrl, publicId }: UploadedImage) => {
+    updateForm("imageUrl", imageUrl);
+    updateForm("publicId", publicId);
+    updateForm("image", imageUrl); // keep legacy field in sync
+  };
+
+  const handleImageClear = () => {
+    updateForm("imageUrl", "");
+    updateForm("publicId", "");
+    updateForm("image", "");
+  };
+
+  // ── Map / geocoding ────────────────────────────────────────────────────────
+
+  const handleMapClick = async (lat: number, lng: number) => {
+    updateForm("latitude", lat);
+    updateForm("longitude", lng);
+    setIsLocating(true);
+    try {
+      const address = await reverseGeocode(lat, lng);
+      if (address) updateForm("pickupLocation", address);
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  const handleAddressBlur = async () => {
+    if (!formData.pickupLocation) return;
+    setIsLocating(true);
+    try {
+      const { lat, lng } = await geocodeAddress(formData.pickupLocation);
+      updateForm("latitude", lat);
+      updateForm("longitude", lng);
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  // ── Navigation ──────────────────────────────────────────────────────────────
 
   const handleNext = () => setStep((s) => Math.min(4, s + 1));
   const handlePrev = () => setStep((s) => Math.max(1, s - 1));
 
-  const handleSubmit = () => {
+  // ── Submit ──────────────────────────────────────────────────────────────────
+
+  const handleSubmit = async () => {
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      // Get the local date in YYYY-MM-DD format to prevent timezone offset expiration bugs
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      const today = `${year}-${month}-${day}`;
+      
+      const dataToSubmit = {
+        ...formData,
+        availableFrom: `${today}T${formData.availableFrom}:00`,
+        availableUntil: `${today}T${formData.availableUntil}:00`,
+      };
+      await createDonation(dataToSubmit);
       setIsSuccess(true);
-    }, 1500);
+    } catch (error) {
+      console.error("Failed to create donation:", error);
+      alert("Failed to create donation. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  // ── Success screen ──────────────────────────────────────────────────────────
 
   if (isSuccess) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[600px] p-4 text-center animate-fade-up">
-        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-6 shadow-xl shadow-emerald-200/50 dark:shadow-none">
+        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 mb-6 shadow-xl shadow-emerald-200/50 dark:shadow-none">
           <CheckCircle2 className="h-12 w-12" />
         </div>
         <h2 className="text-3xl font-bold mb-3">Donation Created!</h2>
         <p className="text-muted-foreground max-w-md mb-8">
-          Your food is now live and receivers within a 5km radius have been notified. Thank you for making a difference!
+          Your food is now live and receivers within a 5 km radius have been notified. Thank you for making a difference!
         </p>
         <div className="flex gap-4">
           <Link href="/donor/donations">
@@ -73,6 +193,8 @@ export default function CreateDonationWizard() {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
       <div className="mb-8">
@@ -80,7 +202,7 @@ export default function CreateDonationWizard() {
         <p className="text-muted-foreground">List excess food for immediate rescue</p>
       </div>
 
-      {/* Progress Bar */}
+      {/* ── Progress Bar ── */}
       <div className="mb-8 relative">
         <div className="absolute top-1/2 left-0 w-full h-1 bg-muted -translate-y-1/2 rounded-full" />
         <div
@@ -120,18 +242,24 @@ export default function CreateDonationWizard() {
       <Card className="shadow-lg border-muted/50 overflow-hidden">
         <CardContent className="p-0">
           <div className="p-6 sm:p-8 min-h-[400px]">
-            {/* Step 1: Details */}
+
+            {/* ── Step 1: Food Details ── */}
             {step === 1 && (
               <div className="space-y-6 animate-fade-up">
                 <div className="space-y-2">
                   <Label>Food Name</Label>
-                  <Input placeholder="e.g. Chicken Biryani, Assorted Sandwiches" className="h-12 rounded-xl text-lg" />
+                  <Input
+                    placeholder="e.g. Chicken Biryani, Assorted Sandwiches"
+                    className="h-12 rounded-xl text-lg"
+                    value={formData.foodName}
+                    onChange={(e) => updateForm("foodName", e.target.value)}
+                  />
                 </div>
-                
+
                 <div className="grid sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label>Category</Label>
-                    <Select>
+                    <Select value={formData.category} onValueChange={(v) => updateForm("category", v)}>
                       <SelectTrigger className="h-12 rounded-xl">
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
@@ -146,7 +274,10 @@ export default function CreateDonationWizard() {
                   </div>
                   <div className="space-y-2">
                     <Label>Dietary Type</Label>
-                    <Select>
+                    <Select
+                      value={formData.isVeg ? "veg" : "non-veg"}
+                      onValueChange={(v) => updateForm("isVeg", v === "veg")}
+                    >
                       <SelectTrigger className="h-12 rounded-xl">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
@@ -162,11 +293,20 @@ export default function CreateDonationWizard() {
                 <div className="grid sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label>Quantity (Servings)</Label>
-                    <Input type="number" placeholder="e.g. 50" className="h-12 rounded-xl" />
+                    <Input
+                      type="number"
+                      placeholder="e.g. 50"
+                      className="h-12 rounded-xl"
+                      value={formData.servings || ""}
+                      onChange={(e) => {
+                        updateForm("servings", Number(e.target.value));
+                        updateForm("quantity", `${e.target.value} servings`);
+                      }}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Storage Temperature</Label>
-                    <Select>
+                    <Select value={formData.temperature} onValueChange={(v) => updateForm("temperature", v)}>
                       <SelectTrigger className="h-12 rounded-xl">
                         <SelectValue placeholder="Select temp" />
                       </SelectTrigger>
@@ -182,56 +322,100 @@ export default function CreateDonationWizard() {
 
                 <div className="space-y-2">
                   <Label>Description & Ingredients (Optional)</Label>
-                  <Textarea placeholder="Any specific details, allergens, or instructions..." className="min-h-[100px] rounded-xl resize-none" />
+                  <Textarea
+                    placeholder="Any specific details, allergens, or instructions..."
+                    className="min-h-[100px] rounded-xl resize-none"
+                    value={formData.description}
+                    onChange={(e) => updateForm("description", e.target.value)}
+                  />
                 </div>
               </div>
             )}
 
-            {/* Step 2: Photo */}
+            {/* ── Step 2: Photo (Cloudinary) ── */}
             {step === 2 && (
               <div className="space-y-6 animate-fade-up">
                 <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex gap-3">
                   <Info className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                   <p className="text-sm text-amber-800 dark:text-amber-300">
-                    A clear photo increases collection rates by 80%. Please ensure the photo accurately represents the current state of the food.
+                    A clear photo increases collection rates by 80%. Images are securely stored on Cloudinary — not on our servers.
                   </p>
                 </div>
-                
-                <div className="border-2 border-dashed rounded-2xl p-8 hover:bg-accent/50 transition-colors cursor-pointer group flex flex-col items-center justify-center min-h-[250px] text-center">
-                  <div className="h-16 w-16 rounded-full bg-sky-50 dark:bg-sky-950/30 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <ImageIcon className="h-8 w-8 text-sky-500" />
-                  </div>
-                  <h3 className="font-semibold text-lg mb-1">Click to upload photo</h3>
-                  <p className="text-sm text-muted-foreground">or drag and drop</p>
-                  <p className="text-xs text-muted-foreground mt-4">JPG, PNG up to 5MB</p>
-                </div>
+
+                <ImageUploader
+                  onUploadSuccess={handleUploadSuccess}
+                  onClear={handleImageClear}
+                  initialImageUrl={formData.imageUrl}
+                  initialPublicId={formData.publicId}
+                />
               </div>
             )}
 
-            {/* Step 3: Pickup Info */}
+            {/* ── Step 3: Pickup Info ── */}
             {step === 3 && (
               <div className="space-y-6 animate-fade-up">
                 <div className="space-y-4">
-                  <h3 className="font-semibold flex items-center gap-2"><MapPin className="h-4 w-4 text-sky-500" /> Location</h3>
-                  <div className="p-4 rounded-xl border bg-muted/30">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium">Grand Palace Banquet</span>
-                      <Button variant="link" size="sm" className="h-auto p-0 text-sky-500">Change</Button>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-sky-500" /> Location
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <Input
+                        value={formData.pickupLocation}
+                        onChange={(e) => updateForm("pickupLocation", e.target.value)}
+                        onBlur={handleAddressBlur}
+                        placeholder="Enter pickup address"
+                        className="pr-10 h-12 rounded-xl"
+                      />
+                      {isLocating && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-sky-500" />
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground">123 MG Road, Bangalore, 560001</p>
+                    <div className="rounded-xl overflow-hidden border border-sky-100 dark:border-sky-900 shadow-sm relative">
+                      <GoogleMap
+                        height="h-[250px]"
+                        center={{ lat: formData.latitude, lng: formData.longitude }}
+                        zoom={15}
+                        onMapClick={handleMapClick}
+                        markers={[
+                          {
+                            id: "pickup",
+                            label: "Pickup",
+                            type: "available",
+                            position: { lat: formData.latitude, lng: formData.longitude },
+                          },
+                        ]}
+                      />
+                      <div className="absolute bottom-2 left-2 right-2 bg-background/90 backdrop-blur text-xs px-3 py-1.5 rounded-lg border shadow-sm flex items-center gap-2">
+                        <Info className="h-3.5 w-3.5 text-sky-500 shrink-0" />
+                        <span>Click anywhere on the map to adjust the pin location.</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <h3 className="font-semibold flex items-center gap-2"><Clock className="h-4 w-4 text-sky-500" /> Availability Window</h3>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-sky-500" /> Availability Window
+                  </h3>
                   <div className="grid sm:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label>Available From</Label>
-                      <Input type="time" defaultValue="18:00" className="h-12 rounded-xl" />
+                      <Input
+                        type="time"
+                        value={formData.availableFrom}
+                        onChange={(e) => updateForm("availableFrom", e.target.value)}
+                        className="h-12 rounded-xl"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Available Until</Label>
-                      <Input type="time" defaultValue="22:00" className="h-12 rounded-xl" />
+                      <Input
+                        type="time"
+                        value={formData.availableUntil}
+                        onChange={(e) => updateForm("availableUntil", e.target.value)}
+                        className="h-12 rounded-xl"
+                      />
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
@@ -241,22 +425,39 @@ export default function CreateDonationWizard() {
               </div>
             )}
 
-            {/* Step 4: Review */}
+            {/* ── Step 4: Review ── */}
             {step === 4 && (
               <div className="space-y-6 animate-fade-up">
                 <div className="bg-sky-50 dark:bg-sky-950/20 rounded-2xl p-6 border border-sky-100 dark:border-sky-900">
                   <h3 className="font-semibold text-lg mb-4 text-center">Ready to publish!</h3>
-                  
+
                   <div className="flex gap-4 items-start mb-6">
-                    <div className="h-24 w-24 rounded-xl bg-muted shrink-0 flex items-center justify-center overflow-hidden">
-                      <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+                    {/* Optimised Cloudinary thumbnail */}
+                    <div className="h-24 w-24 rounded-xl bg-muted shrink-0 overflow-hidden border">
+                      {formData.imageUrl ? (
+                        <CloudinaryImage
+                          src={formData.imageUrl}
+                          alt={formData.foodName}
+                          width={96}
+                          height={96}
+                          wrapperClassName="w-full h-full"
+                          className="rounded-xl"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs text-center px-2">
+                          No photo
+                        </div>
+                      )}
                     </div>
                     <div>
-                      <h4 className="font-bold text-lg">Chicken Biryani</h4>
-                      <p className="text-muted-foreground">50 Servings • Non-Vegetarian</p>
+                      <h4 className="font-bold text-lg">{formData.foodName || "Unnamed Food"}</h4>
+                      <p className="text-muted-foreground">
+                        {formData.servings} Servings •{" "}
+                        {formData.isVeg ? "Vegetarian" : "Non-Vegetarian"}
+                      </p>
                       <div className="flex items-center gap-2 mt-2 text-sm">
                         <Clock className="h-3.5 w-3.5 text-sky-500" />
-                        <span>Today, 6:00 PM - 10:00 PM</span>
+                        <span>Today, {formData.availableFrom} – {formData.availableUntil}</span>
                       </div>
                     </div>
                   </div>
@@ -264,7 +465,7 @@ export default function CreateDonationWizard() {
                   <div className="grid sm:grid-cols-3 gap-3">
                     <div className="bg-white dark:bg-card p-3 rounded-xl border text-center">
                       <p className="text-xs text-muted-foreground mb-1">Initial Radius</p>
-                      <p className="font-bold text-sky-600">5 km</p>
+                      <p className="font-bold text-sky-600">{formData.notificationRadius} km</p>
                     </div>
                     <div className="bg-white dark:bg-card p-3 rounded-xl border text-center">
                       <p className="text-xs text-muted-foreground mb-1">Auto-Expand</p>
@@ -280,7 +481,7 @@ export default function CreateDonationWizard() {
             )}
           </div>
 
-          {/* Footer Actions */}
+          {/* ── Footer Actions ── */}
           <div className="p-6 bg-muted/30 border-t flex items-center justify-between">
             <Button
               variant="outline"
@@ -290,7 +491,7 @@ export default function CreateDonationWizard() {
             >
               <ArrowLeft className="h-4 w-4 mr-2" /> Back
             </Button>
-            
+
             {step < 4 ? (
               <Button
                 onClick={handleNext}
@@ -301,12 +502,18 @@ export default function CreateDonationWizard() {
             ) : (
               <Button
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !formData.foodName}
                 className={`rounded-xl px-8 h-11 text-white border-0 shadow-md transition-all ${
-                  isSubmitting ? "bg-muted text-muted-foreground" : "gradient-success hover:shadow-lg hover:-translate-y-0.5"
+                  isSubmitting || !formData.foodName
+                    ? "bg-muted text-muted-foreground"
+                    : "gradient-success hover:shadow-lg hover:-translate-y-0.5"
                 }`}
               >
-                {isSubmitting ? "Publishing..." : "Publish Donation"}
+                {isSubmitting ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Publishing...</>
+                ) : (
+                  "Publish Donation"
+                )}
               </Button>
             )}
           </div>

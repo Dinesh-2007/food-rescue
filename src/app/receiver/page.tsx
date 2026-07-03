@@ -1,40 +1,64 @@
-"use client";
-
-import { StatCard } from "@/components/stat-card";
+import { ReceiverStatsGrid } from "./receiver-stats-grid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
 import { CountdownTimer } from "@/components/countdown-timer";
-import { MapPlaceholder } from "@/components/map-placeholder";
-import { receiverStats, mockDonations } from "@/lib/mock-data";
+import GoogleMap from "@/components/google-map";
+import { getDonations } from "@/actions/donations";
+import { getUsers } from "@/actions/users";
 import {
-  Utensils,
   MapPin,
-  Clock,
   ArrowUpRight,
-  Leaf,
   Navigation,
   Search,
-  CheckCircle2,
   Bookmark,
   Radio,
+  Utensils,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 
-export default function ReceiverDashboard() {
-  const nearbyFood = mockDonations
-    .filter((d) => d.status === "active")
-    .sort((a, b) => parseFloat(a.distance || "0") - parseFloat(b.distance || "0"))
-    .slice(0, 4);
+export default async function ReceiverDashboard() {
+  let nearbyFood: any[] = [];
+  let myHistory: any[] = [];
+  let me = null;
+
+  try {
+    const receivers = await getUsers({ role: "receiver" });
+    if (receivers.length > 0) me = receivers[0];
+
+    nearbyFood = await getDonations({ status: "active" });
+    nearbyFood = nearbyFood
+      .sort((a, b) => parseFloat(a.distance || "0") - parseFloat(b.distance || "0"))
+      .slice(0, 4);
+      
+    myHistory = await getDonations({ status: "completed" });
+  } catch (error) {
+    console.error("Failed to fetch dashboard data:", error);
+  }
+
+  const savedMeals = myHistory.length * 10; 
+  const co2Saved = Math.round(savedMeals * 0.3);
+
+  const centerLat = me?.latitude || 12.9352;
+  const centerLng = me?.longitude || 77.6245;
+  const locationLabel = me?.address || me?.city || "Koramangala, Bangalore";
+
+  const mapMarkers = nearbyFood.map((food: any) => ({
+    id: String(food.id),
+    label: food.foodName,
+    type: food.freshness || "available",
+    position: { lat: food.latitude || centerLat, lng: food.longitude || centerLng },
+  }));
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Hi, Arun Patel! 👋</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Hi, {me ? me.name : "Guest"}! 👋</h1>
           <p className="text-muted-foreground">
-            Find and rescue food in Koramangala • {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            Find and rescue food near {me ? me.city : "you"} • {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           </p>
         </div>
         <div className="flex gap-2">
@@ -52,12 +76,12 @@ export default function ReceiverDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="Nearby Food" value={receiverStats.nearbyFood} icon={MapPin} trend="Within 5km" color="emerald" />
-        <StatCard title="Posted Today" value={receiverStats.postedToday} icon={Utensils} color="sky" />
-        <StatCard title="Saved Meals" value={receiverStats.savedMeals} icon={CheckCircle2} trend="12 this week" trendUp={true} color="violet" />
-        <StatCard title="CO₂ Saved (kg)" value={receiverStats.co2Saved} icon={Leaf} trend="Top 15% Receiver" trendUp={true} color="amber" />
-      </div>
+      <ReceiverStatsGrid
+        nearbyFoodCount={nearbyFood.length}
+        postedToday={nearbyFood.length} // approx
+        savedMeals={savedMeals}
+        co2Saved={co2Saved}
+      />
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Available Food List */}
@@ -74,50 +98,56 @@ export default function ReceiverDashboard() {
             </Link>
           </CardHeader>
           <CardContent className="space-y-4">
-            {nearbyFood.map((food, i) => (
-              <div
-                key={food.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-2xl border hover:shadow-md transition-all duration-300 animate-slide-up bg-card hover:bg-accent/30"
-                style={{ animationDelay: `${i * 100}ms` }}
-              >
-                <div className="h-20 w-20 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-muted shrink-0 relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={food.image} alt={food.foodName} className="h-full w-full object-cover" />
-                  <div className="absolute top-1 left-1 bg-white/90 dark:bg-black/90 backdrop-blur-sm p-1 rounded-md text-[10px] font-bold">
-                    {food.distance}
-                  </div>
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-semibold text-base truncate pr-2">{food.foodName}</h3>
-                    <div className="shrink-0 flex items-center gap-2">
-                       {food.priority === "high" && <span className="flex h-2 w-2 rounded-full bg-rose-500 animate-pulse" title="High Priority" />}
+            {nearbyFood.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No food available nearby at the moment.
+              </div>
+            ) : (
+              nearbyFood.map((food: any, i) => (
+                <div
+                  key={food.id}
+                  className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-2xl border hover:shadow-md transition-all duration-300 animate-slide-up bg-card hover:bg-accent/30"
+                  style={{ animationDelay: `${i * 100}ms` }}
+                >
+                  <div className="h-20 w-20 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-muted shrink-0 relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={food.image} alt={food.foodName} className="h-full w-full object-cover" />
+                    <div className="absolute top-1 left-1 bg-white/90 dark:bg-black/90 backdrop-blur-sm p-1 rounded-md text-[10px] font-bold">
+                      {food.distance || "5km"}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                    <span>{food.quantity}</span>
-                    <span>•</span>
-                    <span className="truncate">{food.donorName}</span>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start mb-1">
+                      <h3 className="font-semibold text-base truncate pr-2">{food.foodName}</h3>
+                      <div className="shrink-0 flex items-center gap-2">
+                         {food.priority === "high" && <span className="flex h-2 w-2 rounded-full bg-rose-500 animate-pulse" title="High Priority" />}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                      <span>{food.quantity}</span>
+                      <span>•</span>
+                      <span className="truncate">{food.donorName}</span>
+                    </div>
+                    <div className="flex items-center justify-between flex-wrap gap-2 mt-auto">
+                      <StatusBadge status={food.freshness} />
+                      <CountdownTimer targetDate={food.availableUntil} compact />
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between flex-wrap gap-2 mt-auto">
-                    <StatusBadge status={food.freshness} />
-                    <CountdownTimer targetDate={food.availableUntil} compact />
-                  </div>
-                </div>
 
-                <div className="flex sm:flex-col gap-2 shrink-0 w-full sm:w-auto mt-2 sm:mt-0">
-                  <Link href={`/receiver/available/${food.id}`} className="flex-1 sm:w-full">
-                    <Button className="w-full rounded-xl text-xs gradient-sky text-white border-0 shadow-md h-8">
-                      View Details
+                  <div className="flex sm:flex-col gap-2 shrink-0 w-full sm:w-auto mt-2 sm:mt-0">
+                    <Link href={`/receiver/available/${food.id}`} className="flex-1 sm:w-full">
+                      <Button className="w-full rounded-xl text-xs gradient-sky text-white border-0 shadow-md h-8">
+                        View Details
+                      </Button>
+                    </Link>
+                    <Button variant="outline" size="icon" className="h-8 w-8 rounded-xl shrink-0 text-muted-foreground hover:text-sky-500">
+                      <Bookmark className="h-3.5 w-3.5" />
                     </Button>
-                  </Link>
-                  <Button variant="outline" size="icon" className="h-8 w-8 rounded-xl shrink-0 text-muted-foreground hover:text-sky-500">
-                    <Bookmark className="h-3.5 w-3.5" />
-                  </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -130,11 +160,16 @@ export default function ReceiverDashboard() {
                   <Navigation className="h-4 w-4 text-sky-500" />
                   Live Map View
                 </span>
-                <span className="text-xs font-normal text-muted-foreground">Koramangala</span>
+                <span className="text-xs font-normal text-muted-foreground">{locationLabel}</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <MapPlaceholder height="h-48" showLegend={false} />
+              <GoogleMap
+                height="h-[250px]"
+                center={{ lat: centerLat, lng: centerLng }}
+                zoom={14}
+                markers={mapMarkers}
+              />
             </CardContent>
           </Card>
 

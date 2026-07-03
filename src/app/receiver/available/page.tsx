@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { CountdownTimer } from "@/components/countdown-timer";
 import { EmptyState } from "@/components/empty-state";
-import { mockDonations } from "@/lib/mock-data";
+import { getDonations } from "@/actions/donations";
 import {
   Search,
   MapPin,
@@ -25,13 +25,28 @@ const filterTabs = ["All", "< 2km", "< 5km", "Vegetarian", "High Priority"];
 export default function AvailableFoodPage() {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
+  const [available, setAvailable] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const available = mockDonations.filter((d) => d.status === "active").sort((a, b) => parseFloat(a.distance || "0") - parseFloat(b.distance || "0"));
+  useEffect(() => {
+    async function loadData() {
+      try {
+        let data = await getDonations({ status: "active" });
+        data = data.sort((a: any, b: any) => parseFloat(a.distance || "0") - parseFloat(b.distance || "0"));
+        setAvailable(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   const filtered = available.filter((d) => {
     if (search && !d.foodName.toLowerCase().includes(search.toLowerCase()) && !d.donorName.toLowerCase().includes(search.toLowerCase())) return false;
-    if (activeFilter === "< 2km" && parseFloat(d.distance || "0") > 2) return false;
-    if (activeFilter === "< 5km" && parseFloat(d.distance || "0") > 5) return false;
+    if (activeFilter === "< 2km" && parseFloat(d.distance || "5") > 2) return false;
+    if (activeFilter === "< 5km" && parseFloat(d.distance || "5") > 5) return false;
     if (activeFilter === "Vegetarian" && !d.isVeg) return false;
     if (activeFilter === "High Priority" && d.priority !== "high") return false;
     return true;
@@ -78,7 +93,9 @@ export default function AvailableFoodPage() {
       </div>
 
       {/* Food Grid */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="py-8 text-center text-muted-foreground animate-pulse">Loading available food...</div>
+      ) : filtered.length === 0 ? (
         <EmptyState icon={Utensils} title="No food found" description="Try adjusting your filters or check back later." />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -92,7 +109,7 @@ export default function AvailableFoodPage() {
                 {/* Overlays */}
                 <div className="absolute top-2 left-2 flex flex-col gap-2">
                   <div className="bg-white/90 dark:bg-black/90 backdrop-blur-md px-2 py-1 rounded-lg text-xs font-bold shadow-md flex items-center gap-1">
-                    <MapPin className="h-3 w-3 text-sky-500" /> {food.distance}
+                    <MapPin className="h-3 w-3 text-sky-500" /> {food.distance || "5km"}
                   </div>
                   {food.priority === "high" && (
                     <div className="bg-rose-500 text-white px-2 py-1 rounded-lg text-[10px] font-bold shadow-md flex items-center gap-1 animate-pulse">

@@ -13,7 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { mockReports } from "@/lib/mock-data";
 import { Flag, AlertTriangle, Ban, Trash2, CheckCircle2, Shield, Calendar, User, Package } from "lucide-react";
 
 const filterTabs = ["All", "Spam", "Fake Donations", "Complaints", "Expired", "Inactive Users", "Suspicious"];
@@ -28,6 +27,8 @@ const typeConfig: Record<string, { color: string; icon: string }> = {
 };
 
 export default function ReportsPage() {
+  const mockReports: any[] = [];
+
   const [activeFilter, setActiveFilter] = useState("All");
 
   const filtered = mockReports.filter((r) => {
@@ -125,7 +126,7 @@ export default function ReportsPage() {
                       {/* Type */}
                       <TableCell className="align-middle">
                         <Badge variant="outline" className="font-medium text-[11px] bg-background">
-                          {report.type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                          {report.type.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}
                         </Badge>
                       </TableCell>
 

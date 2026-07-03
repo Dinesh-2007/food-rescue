@@ -1,19 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { StatusBadge } from "@/components/status-badge";
-import { mockReceivers } from "@/lib/mock-data";
+import { getUsers } from "@/actions/users";
 import { Search, Eye, Trash2, Ban, Users, Bell, MapPin, History } from "lucide-react";
 
 export default function AdminReceiversPage() {
   const [search, setSearch] = useState("");
+  const [mockReceivers, setMockReceivers] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await getUsers({ role: "receiver" });
+        setMockReceivers(data);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    loadData();
+  }, []);
 
   const filtered = mockReceivers.filter((r) => {
-    if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !r.name?.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
@@ -42,7 +55,7 @@ export default function AdminReceiversPage() {
               <div className="flex items-start gap-3 mb-4">
                 <Avatar className="h-12 w-12 rounded-xl">
                   <AvatarFallback className="bg-emerald-100 text-emerald-700 font-semibold rounded-xl dark:bg-emerald-900 dark:text-emerald-300">
-                    {receiver.name.split(" ").map((n) => n[0]).join("")}
+                    {receiver.name ? receiver.name.split(" ").map((n: string) => n[0]).join("") : "U"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">

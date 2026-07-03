@@ -1,12 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  donorStats,
-  monthlyDonorDonations,
-  donorFoodCategories,
-} from "@/lib/mock-data";
+import { getDonations } from "@/actions/donations";
 import {
   Utensils,
   Package,
@@ -32,6 +29,46 @@ import {
 const PIE_COLORS = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e"];
 
 export default function DonorAnalyticsPage() {
+  const [estimatedMeals, setEstimatedMeals] = useState(0);
+  const [foodSavedKg, setFoodSavedKg] = useState(0);
+  const [co2Reduced, setCo2Reduced] = useState(0);
+  const [successRate, setSuccessRate] = useState(0);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const allDonations = await getDonations();
+        const totalDonations = allDonations.length;
+        const completedDonations = allDonations.filter((d: any) => d.status === "completed").length;
+        const meals = allDonations.reduce((sum: number, d: any) => sum + (d.servings || 0), 0);
+        const foodKg = Math.round(meals * 0.4);
+        const co2 = Math.round(foodKg * 0.7);
+        const rate = totalDonations > 0 ? Math.round((completedDonations / totalDonations) * 100) : 0;
+        
+        setEstimatedMeals(meals);
+        setFoodSavedKg(foodKg);
+        setCo2Reduced(co2);
+        setSuccessRate(rate);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    loadData();
+  }, []);
+
+  // Chart defaults for now since we don't have enough DB data history
+  const monthlyDonorDonations = [
+    { month: "Jan", donations: 0 },
+    { month: "Feb", donations: 0 },
+    { month: "Mar", donations: 0 },
+  ];
+  const donorFoodCategories = [
+    { name: "Produce", value: 0 },
+    { name: "Prepared", value: 0 },
+    { name: "Dairy", value: 0 },
+    { name: "Baked", value: 0 },
+  ];
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-8">
       <div>
@@ -41,10 +78,10 @@ export default function DonorAnalyticsPage() {
 
       {/* Impact Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="Meals Served" value={donorStats.estimatedMeals.toLocaleString()} icon={Utensils} trend="+12% this month" trendUp={true} color="sky" />
-        <StatCard title="Food Saved" value={`${donorStats.foodSavedKg.toLocaleString()} kg`} icon={Package} trend="+18% this month" trendUp={true} color="emerald" />
-        <StatCard title="CO₂ Reduction" value={`${donorStats.co2Reduced} kg`} icon={Leaf} trend="+85 kg this month" trendUp={true} color="violet" />
-        <StatCard title="Success Rate" value={`${donorStats.successRate}%`} icon={TrendingUp} trend="+2%" trendUp={true} color="amber" />
+        <StatCard title="Meals Served" value={estimatedMeals.toLocaleString()} icon={Utensils} trend="+0% this month" trendUp={true} color="sky" />
+        <StatCard title="Food Saved" value={`${foodSavedKg.toLocaleString()} kg`} icon={Package} trend="+0% this month" trendUp={true} color="emerald" />
+        <StatCard title="CO₂ Reduction" value={`${co2Reduced} kg`} icon={Leaf} trend="+0 kg this month" trendUp={true} color="violet" />
+        <StatCard title="Success Rate" value={`${successRate}%`} icon={TrendingUp} trend="+0%" trendUp={true} color="amber" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -123,7 +160,7 @@ export default function DonorAnalyticsPage() {
               </div>
               <div className="flex items-center gap-2 text-sky-600 font-bold text-lg">
                 <Timer className="h-5 w-5" />
-                {donorStats.avgCollectionTime}
+                45m
               </div>
             </div>
             <div className="flex items-center justify-between p-4 rounded-xl border">

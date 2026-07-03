@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { mockDonors } from "@/lib/mock-data";
+import { getUsers } from "@/actions/users";
 import {
   Search,
   Eye,
@@ -26,9 +26,22 @@ import {
 
 export default function AdminDonorsPage() {
   const [search, setSearch] = useState("");
+  const [mockDonors, setMockDonors] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await getUsers({ role: "donor" });
+        setMockDonors(data);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    loadData();
+  }, []);
 
   const filtered = mockDonors.filter((d) => {
-    if (search && !d.name.toLowerCase().includes(search.toLowerCase()) && !d.businessName?.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !d.name?.toLowerCase().includes(search.toLowerCase()) && !d.businessName?.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
@@ -85,8 +98,8 @@ export default function AdminDonorsPage() {
                   <TableCell className="pl-6 align-middle">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-11 w-11 rounded-full border border-background shadow-sm">
-                        <AvatarFallback className="bg-gradient-to-br from-sky-100 to-sky-50 text-sky-700 font-bold dark:from-sky-900/50 dark:to-sky-800/50 dark:text-sky-300">
-                          {donor.name.split(" ").map((n) => n[0]).join("")}
+                        <AvatarFallback className="bg-gradient-to-br from-sky-100 to-sky-50 text-sky-700 font-semibold text-sm">
+                          {donor.name ? donor.name.split(" ").map((n: string) => n[0]).join("") : "U"}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col justify-center">

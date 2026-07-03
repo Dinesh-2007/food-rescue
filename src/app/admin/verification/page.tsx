@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
-import { mockVerificationQueue } from "@/lib/mock-data";
 import {
   ShieldCheck,
   CheckCircle2,
@@ -19,8 +18,9 @@ import {
 } from "lucide-react";
 
 export default function VerificationQueuePage() {
-  const pending = mockVerificationQueue.filter((v) => v.status === "pending");
-  const needsInfo = mockVerificationQueue.filter((v) => v.status === "more_info_needed");
+  const mockVerificationQueue: any[] = [];
+  const pending: any[] = [];
+  const needsInfo: any[] = [];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -97,7 +97,7 @@ export default function VerificationQueuePage() {
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Documents</p>
                       <div className="space-y-2">
-                        {entry.documents.map((doc) => (
+                        {entry.documents.map((doc: string) => (
                           <div key={doc} className="flex items-center gap-2 p-2 rounded-lg border hover:bg-accent/50 transition-colors cursor-pointer">
                             <FileText className="h-4 w-4 text-sky-500" />
                             <span className="text-sm truncate">{doc}</span>

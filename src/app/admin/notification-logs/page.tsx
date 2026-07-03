@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/status-badge";
 import { RadiusTimeline } from "@/components/radius-timeline";
-import { mockNotificationLogs } from "@/lib/mock-data";
 import { Radio, Bell, Users, TrendingUp, CheckCircle2, XCircle, Clock } from "lucide-react";
 
 const resultIcons = {
@@ -15,9 +14,10 @@ const resultIcons = {
 };
 
 export default function NotificationLogsPage() {
-  const totalNotified = mockNotificationLogs.reduce((sum, l) => sum + l.usersNotified, 0);
-  const avgExpansions = (mockNotificationLogs.reduce((sum, l) => sum + l.expansionCount, 0) / mockNotificationLogs.length).toFixed(1);
-  const successCount = mockNotificationLogs.filter((l) => l.collectionResult === "collected").length;
+  const mockNotificationLogs: any[] = [];
+  const totalNotified = 0;
+  const avgExpansions = "0.0";
+  const successCount = 0;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -77,7 +77,7 @@ export default function NotificationLogsPage() {
       {/* Logs */}
       <div className="space-y-4">
         {mockNotificationLogs.map((log) => {
-          const ResultIcon = resultIcons[log.collectionResult];
+          const ResultIcon = resultIcons[log.collectionResult as keyof typeof resultIcons];
           return (
             <Card key={log.id} className="overflow-hidden hover:shadow-lg transition-all duration-300">
               <CardContent className="p-5">
@@ -112,7 +112,7 @@ export default function NotificationLogsPage() {
                   <div className="flex items-center justify-center">
                     <RadiusTimeline
                       compact
-                      steps={log.expansionTimeline.map((e, i) => ({
+                      steps={log.expansionTimeline.map((e: any, i: number) => ({
                         radius: e.radius,
                         notified: e.notified,
                         status: i < log.expansionTimeline.length - 1 ? "completed" as const :

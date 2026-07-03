@@ -1,43 +1,54 @@
-"use client";
-
-import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
 import { RadiusTimeline } from "@/components/radius-timeline";
 import { CountdownTimer } from "@/components/countdown-timer";
-import { donorStats, mockDonations, mockLiveActivity, mockNotifications } from "@/lib/mock-data";
+import { DonorStatsGrid } from "./donor-stats-grid";
 import {
-  Package,
-  Zap,
-  CheckCircle2,
-  Utensils,
   Plus,
-  Clock,
   ArrowUpRight,
-  Leaf,
-  Timer,
-  TrendingUp,
   Eye,
   Users,
   Radio,
   Activity,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { getUsers } from "@/actions/users";
+import { getDonations } from "@/actions/donations";
 
-export default function DonorDashboard() {
-  const activeDonations = mockDonations.filter((d) => d.status === "active" && (d.donorId === "USR-D001" || d.donorId === "USR-D002")).slice(0, 4);
-  const donorActivity = mockLiveActivity.filter((a) => a.donationId).slice(0, 6);
+export default async function DonorDashboard() {
+  let activeDonations: any[] = [];
+  let allDonations: any[] = [];
+  let me = null;
+
+  try {
+    const donors = await getUsers({ role: "donor" });
+    if (donors.length > 0) me = donors[0];
+
+    allDonations = await getDonations();
+    activeDonations = allDonations.filter(d => d.status === "active").slice(0, 4);
+  } catch (error) {
+    console.error("Failed to fetch dashboard data:", error);
+  }
+
+  const donorActivity: any[] = []; // Live activity stream will be powered by DB/WebSockets later
+
+  const totalDonations = allDonations.length;
+  const completedDonations = allDonations.filter((d: any) => d.status === "completed").length;
+  const estimatedMeals = allDonations.reduce((sum: number, d: any) => sum + (d.servings || 0), 0);
+  const foodSavedKg = Math.round(estimatedMeals * 0.4);
+  const co2Reduced = Math.round(foodSavedKg * 0.7);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Welcome back, Rajesh! 👋</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Welcome back, {me ? me.name.split(' ')[0] : "Guest"}! 👋</h1>
           <p className="text-muted-foreground">
-            Grand Palace Banquet • {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            {me ? me.businessName || "Individual Donor" : "Food Rescue"} • {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </p>
         </div>
         <Link href="/donor/create">
@@ -49,19 +60,16 @@ export default function DonorDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="Total Donations" value={donorStats.totalDonations} icon={Package} trend="12% this month" trendUp={true} color="sky" />
-        <StatCard title="Active Donations" value={donorStats.activeDonations} icon={Zap} color="amber" />
-        <StatCard title="Completed" value={donorStats.completedDonations} icon={CheckCircle2} trend="8 this week" trendUp={true} color="emerald" />
-        <StatCard title="Est. Meals Served" value={donorStats.estimatedMeals.toLocaleString()} icon={Utensils} trend="150 this month" trendUp={true} color="violet" />
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="Food Saved (kg)" value={donorStats.foodSavedKg.toLocaleString()} icon={Package} color="sky" />
-        <StatCard title="CO₂ Reduced (kg)" value={donorStats.co2Reduced} icon={Leaf} color="emerald" />
-        <StatCard title="Avg Collection" value={donorStats.avgCollectionTime} icon={Timer} color="amber" />
-        <StatCard title="Success Rate" value={`${donorStats.successRate}%`} icon={TrendingUp} trend="+2%" trendUp={true} color="violet" />
-      </div>
+      <DonorStatsGrid
+        activeDonationsCount={activeDonations.length}
+        totalDonations={totalDonations}
+        completedDonations={completedDonations}
+        estimatedMeals={estimatedMeals}
+        foodSavedKg={foodSavedKg}
+        co2Reduced={co2Reduced}
+        avgCollectionTime="45m"
+        successRate={totalDonations > 0 ? Math.round((completedDonations / totalDonations) * 100) : 0}
+      />
 
       {/* Active Donation Monitor */}
       <Card>
@@ -77,54 +85,60 @@ export default function DonorDashboard() {
           </Link>
         </CardHeader>
         <CardContent>
-          <div className="grid sm:grid-cols-2 gap-4">
-            {activeDonations.map((donation) => (
-              <div
-                key={donation.id}
-                className="p-4 rounded-2xl border hover:shadow-md transition-all duration-300"
-              >
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="h-14 w-14 rounded-xl overflow-hidden bg-muted shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={donation.image} alt={donation.foodName} className="h-full w-full object-cover" />
+          {activeDonations.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No active donations right now. Create one to get started!
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {activeDonations.map((donation: any) => (
+                <div
+                  key={donation.id}
+                  className="p-4 rounded-2xl border hover:shadow-md transition-all duration-300"
+                >
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="h-14 w-14 rounded-xl overflow-hidden bg-muted shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={donation.image} alt={donation.foodName} className="h-full w-full object-cover" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">{donation.foodName}</p>
+                      <p className="text-xs text-muted-foreground">{donation.quantity}</p>
+                      <StatusBadge status={donation.freshness} className="mt-1" />
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{donation.foodName}</p>
-                    <p className="text-xs text-muted-foreground">{donation.quantity}</p>
-                    <StatusBadge status={donation.freshness} className="mt-1" />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-3 gap-2 mb-3 text-center">
-                  <div className="p-2 rounded-lg bg-muted/50">
-                    <p className="text-xs text-muted-foreground">Notified</p>
-                    <p className="text-sm font-bold flex items-center justify-center gap-1">
-                      <Users className="h-3 w-3" /> {donation.receiversNotified}
-                    </p>
+                  <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+                    <div className="p-2 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Notified</p>
+                      <p className="text-sm font-bold flex items-center justify-center gap-1">
+                        <Users className="h-3 w-3" /> {donation.receiversNotified || 0}
+                      </p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Views</p>
+                      <p className="text-sm font-bold flex items-center justify-center gap-1">
+                        <Eye className="h-3 w-3" /> {donation.views || 0}
+                      </p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Radius</p>
+                      <p className="text-sm font-bold flex items-center justify-center gap-1">
+                        <Radio className="h-3 w-3" /> {donation.currentRadius || 5}km
+                      </p>
+                    </div>
                   </div>
-                  <div className="p-2 rounded-lg bg-muted/50">
-                    <p className="text-xs text-muted-foreground">Views</p>
-                    <p className="text-sm font-bold flex items-center justify-center gap-1">
-                      <Eye className="h-3 w-3" /> {donation.views}
-                    </p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-muted/50">
-                    <p className="text-xs text-muted-foreground">Radius</p>
-                    <p className="text-sm font-bold flex items-center justify-center gap-1">
-                      <Radio className="h-3 w-3" /> {donation.currentRadius}km
-                    </p>
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between">
-                  <CountdownTimer targetDate={donation.availableUntil} compact />
-                  <Badge variant="secondary" className="rounded-full text-xs">
-                    {donation.pickupLocation.split(",")[0]}
-                  </Badge>
+                  <div className="flex items-center justify-between">
+                    <CountdownTimer targetDate={donation.availableUntil} compact />
+                    <Badge variant="secondary" className="rounded-full text-xs truncate max-w-[150px]">
+                      {donation.pickupLocation.split(",")[0]}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -143,18 +157,24 @@ export default function DonorDashboard() {
             </div>
           </CardHeader>
           <CardContent className="space-y-1">
-            {donorActivity.map((activity, i) => (
-              <div key={activity.id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-accent/50 transition-colors">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 dark:bg-sky-950/30 text-base shrink-0">
-                  {activity.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{activity.action}</p>
-                  <p className="text-xs text-muted-foreground truncate">{activity.detail}</p>
-                </div>
-                <span className="text-xs text-muted-foreground whitespace-nowrap">{activity.timestamp}</span>
+            {donorActivity.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground text-sm">
+                No recent activity.
               </div>
-            ))}
+            ) : (
+              donorActivity.map((activity, i) => (
+                <div key={activity.id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-accent/50 transition-colors">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 dark:bg-sky-950/30 text-base shrink-0">
+                    {activity.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{activity.action}</p>
+                    <p className="text-xs text-muted-foreground truncate">{activity.detail}</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{activity.timestamp}</span>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
 

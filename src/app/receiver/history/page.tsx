@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
-import { mockDonations, receiverStats } from "@/lib/mock-data";
+import { getDonations } from "@/actions/donations";
 import {
   Search,
   History,
@@ -22,14 +22,32 @@ const filterTabs = ["All Time", "This Month", "This Week"];
 export default function ReceiverHistoryPage() {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("All Time");
+  const [myHistory, setMyHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mocking history by taking completed donations and assigning them to this receiver
-  const myHistory = mockDonations.filter((d) => d.status === "completed");
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await getDonations({ status: "completed" });
+        setMyHistory(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  // Mocking history — shows completed donations
 
   const filtered = myHistory.filter((d) => {
     if (search && !d.foodName.toLowerCase().includes(search.toLowerCase()) && !d.donorName.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+
+  const savedMeals = myHistory.length * 10;
+  const co2Saved = Math.round(savedMeals * 0.3);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -42,29 +60,35 @@ export default function ReceiverHistoryPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="bg-sky-50/50 dark:bg-sky-950/20 border-sky-100 dark:border-sky-900">
           <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
-            <History className="h-5 w-5 text-sky-500 mb-2" />
-            <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">{receiverStats.savedMeals}</p>
-            <p className="text-xs text-muted-foreground">Total Collections</p>
+            <div className="h-10 w-10 rounded-full bg-sky-100 dark:bg-sky-900 text-sky-600 flex items-center justify-center mb-2">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">{myHistory.length}</p>
+            <p className="text-xs text-muted-foreground mt-1">Total Rescues</p>
           </CardContent>
         </Card>
         <Card className="bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900">
           <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
-            <Utensils className="h-5 w-5 text-emerald-500 mb-2" />
-            <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">1,250</p>
-            <p className="text-xs text-muted-foreground">Meals Provided</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-violet-50/50 dark:bg-violet-950/20 border-violet-100 dark:border-violet-900">
-          <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
-            <Leaf className="h-5 w-5 text-violet-500 mb-2" />
-            <p className="text-2xl font-bold text-violet-700 dark:text-violet-400">{receiverStats.co2Saved}</p>
-            <p className="text-xs text-muted-foreground">CO₂ Reduced (kg)</p>
+            <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-600 flex items-center justify-center mb-2">
+              <Utensils className="h-5 w-5" />
+            </div>
+            <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{savedMeals}</p>
+            <p className="text-xs text-muted-foreground mt-1">Meals Equivalent</p>
           </CardContent>
         </Card>
         <Card className="bg-amber-50/50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900">
           <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
-            <CheckCircle2 className="h-5 w-5 text-amber-500 mb-2" />
-            <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">100%</p>
+            <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900 text-amber-600 flex items-center justify-center mb-2">
+              <Leaf className="h-5 w-5" />
+            </div>
+            <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{co2Saved}</p>
+            <p className="text-xs text-muted-foreground mt-1">CO₂ Reduced (kg)</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-violet-50/50 dark:bg-violet-950/20 border-violet-100 dark:border-violet-900">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
+            <CheckCircle2 className="h-5 w-5 text-violet-500 mb-2" />
+            <p className="text-2xl font-bold text-violet-700 dark:text-violet-400">100%</p>
             <p className="text-xs text-muted-foreground">Pickup Success Rate</p>
           </CardContent>
         </Card>

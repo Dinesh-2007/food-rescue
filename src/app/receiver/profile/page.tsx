@@ -1,10 +1,9 @@
-"use client";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
-import { receiverStats } from "@/lib/mock-data";
+import { getUsers } from "@/actions/users";
+import { getDonations } from "@/actions/donations";
 import {
   MapPin,
   Mail,
@@ -19,7 +18,20 @@ import {
   Navigation,
 } from "lucide-react";
 
-export default function ReceiverProfilePage() {
+export default async function ReceiverProfilePage() {
+  const receivers = await getUsers({ role: "receiver" });
+  const me = receivers.length > 0 ? receivers[0] : null;
+  const myHistory = await getDonations({ status: "completed" });
+  
+  const savedMeals = myHistory.length * 10; // estimate
+  const co2Saved = Math.round(savedMeals * 0.3); // 300g per meal
+
+  if (!me) {
+    return <div className="p-8 text-center text-muted-foreground">No receiver profile found. Please register.</div>;
+  }
+
+  const initials = me.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">
       {/* Profile Header */}
@@ -29,13 +41,13 @@ export default function ReceiverProfilePage() {
           <div className="flex flex-col sm:flex-row sm:items-end gap-6 -mt-12 mb-6">
             <Avatar className="h-24 w-24 border-4 border-card rounded-2xl shadow-xl">
               <AvatarFallback className="bg-violet-100 text-violet-700 text-2xl font-bold dark:bg-violet-900 dark:text-violet-300">
-                AP
+                {initials}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl font-bold truncate">Arun Patel</h1>
-                <StatusBadge status="verified" />
+                <h1 className="text-2xl font-bold truncate">{me.name}</h1>
+                <StatusBadge status={me.verificationStatus || "unverified"} />
               </div>
               <p className="text-muted-foreground flex items-center gap-2">
                 Individual Receiver
@@ -51,22 +63,22 @@ export default function ReceiverProfilePage() {
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
               <MapPin className="h-5 w-5 text-sky-500" />
               <div>
-                <p className="text-xs text-muted-foreground">Primary Location</p>
-                <p className="text-sm font-medium">Koramangala, Bangalore</p>
+                <p className="text-xs text-muted-foreground">Location</p>
+                <p className="text-sm font-medium">{me.city || "Not set"}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
               <Mail className="h-5 w-5 text-sky-500" />
               <div>
                 <p className="text-xs text-muted-foreground">Email</p>
-                <p className="text-sm font-medium">arun.patel@example.com</p>
+                <p className="text-sm font-medium">{me.email || "Not set"}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
               <Phone className="h-5 w-5 text-sky-500" />
               <div>
                 <p className="text-xs text-muted-foreground">Phone</p>
-                <p className="text-sm font-medium">+91 98765 12345</p>
+                <p className="text-sm font-medium">{me.phone || "Not set"}</p>
               </div>
             </div>
           </div>
@@ -86,7 +98,7 @@ export default function ReceiverProfilePage() {
             <CardContent className="space-y-4">
               <div className="text-center p-4 rounded-xl border bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800">
                 <p className="text-xs text-muted-foreground mb-1">Pickup Success Rate</p>
-                <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">100%</p>
+                <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{me.completionRate || 100}%</p>
                 <p className="text-xs text-emerald-600/80 mt-1">Excellent Standing</p>
               </div>
               <div className="space-y-3">
@@ -141,26 +153,27 @@ export default function ReceiverProfilePage() {
                   <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900 text-sky-600 mb-2">
                     <CheckCircle2 className="h-5 w-5" />
                   </div>
-                  <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">{receiverStats.savedMeals}</p>
+                  <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">{myHistory.length}</p>
                   <p className="text-xs text-muted-foreground mt-1">Total Rescues</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 text-center">
                   <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-600 mb-2">
                     <Utensils className="h-5 w-5" />
                   </div>
-                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">1,250</p>
+                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{savedMeals}</p>
                   <p className="text-xs text-muted-foreground mt-1">Meals Equivalent</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 text-center">
                   <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900 text-amber-600 mb-2">
                     <Leaf className="h-5 w-5" />
                   </div>
-                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{receiverStats.co2Saved}</p>
+                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{co2Saved}</p>
                   <p className="text-xs text-muted-foreground mt-1">CO₂ Reduced (kg)</p>
                 </div>
               </div>
             </CardContent>
           </Card>
+
 
           {/* Badges */}
           <Card>
